@@ -19,10 +19,21 @@
     };
   };
 
-  outputs = { self, nixpkgs, rust-overlay, foundry, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+      foundry,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
-        overlays = [ (import rust-overlay) foundry.overlay ];
+        overlays = [
+          (import rust-overlay)
+          foundry.overlay
+        ];
         pkgs = import nixpkgs {
           inherit system overlays;
         };
@@ -40,6 +51,9 @@
             pkgs.libclang.lib
             pkgs.openssl.dev
             pkgs.gmp
+            pkgs.python3
+            pkgs.python3Packages.pip
+            pkgs.python3Packages.pyyaml
             # Mold Linker for faster builds (only on Linux)
             (lib.optionals pkgs.stdenv.isLinux pkgs.om4)
             (lib.optionals pkgs.stdenv.isLinux pkgs.mold)
@@ -60,7 +74,12 @@
           packages = [ ];
           # Environment variables
           RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
-          LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.gmp pkgs.libclang pkgs.openssl.dev ];
+          LD_LIBRARY_PATH = lib.makeLibraryPath [
+            pkgs.gmp
+            pkgs.libclang
+            pkgs.openssl.dev
+          ];
         };
-      });
+      }
+    );
 }
