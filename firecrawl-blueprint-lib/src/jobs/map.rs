@@ -1,4 +1,5 @@
 use crate::context::Context;
+use anyhow::{Error, anyhow};
 use blueprint_sdk::{
     Error as SdkError,
     extract::Context as SdkContext,
@@ -13,7 +14,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum MapHandlerError {
     #[error("HTTP request failed: {0}")]
-    HttpRequest(#[from] reqwest::Error),
+    HttpRequest(Error),
     #[error("JSON parsing failed: {0}")]
     JsonParse(#[from] serde_json::Error),
     #[error("IPFS operation failed: {0}")]
@@ -54,7 +55,7 @@ pub async fn handle_map(
         .json(&input_json) // Send parsed JSON
         .send()
         .await
-        .map_err(MapHandlerError::HttpRequest)?;
+        .map_err(|e| MapHandlerError::HttpRequest(anyhow!(e)))?;
 
     // Ensure the request was successful
     if !response.status().is_success() {
@@ -63,14 +64,11 @@ pub async fn handle_map(
             .text()
             .await
             .unwrap_or_else(|_| "Failed to read error body".to_string());
-        return Err(MapHandlerError::HttpRequest(reqwest::Error::from(
-            // Create an error that includes status and body text
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("HTTP Error {}: {}", status, text),
-            ),
-        ))
-        .into());
+        return Err(MapHandlerError::HttpRequest(anyhow!(
+            "HTTP Error {}: {}",
+            status,
+            text
+        )));
     }
 
     let response_json: Value = response.json().await.map_err(MapHandlerError::JsonParse)?;
@@ -89,5 +87,5 @@ pub async fn handle_map(
     let cid = ipfs_result.hash;
 
     // Return the CID as a TangleResult
-    Ok(TangleResult::new(cid))
+    Ok(TangleResult(cid))
 }

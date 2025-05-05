@@ -46,7 +46,7 @@ pub struct Context {
 
 impl Context {
     /// Initialize Docker client, IPFS client, and store environment.
-    pub fn new(env: BlueprintEnvironment) -> Self {
+    pub async fn new(env: BlueprintEnvironment) -> Self {
         // Take env by value
         // Initialize Docker client
         let docker =
@@ -63,17 +63,20 @@ impl Context {
         };
         let create_opts = CreateContainerOptions {
             name: "firecrawl_service",
+            platform: None,
         };
         let container = docker
             .create_container(Some(create_opts), container_config)
+            .await
             .expect("Failed to create Firecrawl container");
         docker
-            .start_container(&container.id, None::<StartContainerOptions<String>>())
+            .start_container(&container.id, None::<StartContainerOptions<String>>)
+            .await
             .expect("Failed to start Firecrawl container");
 
         // Initialize IPFS client
         let url = Url::parse(&env.ipfs_api_url).expect("Invalid IPFS_API_URL");
-        let ipfs_client = IpfsClient::new(url.host_str().unwrap(), url.port().unwrap_or(5001));
+        let ipfs_client = IpfsClient::default();
 
         Context {
             env, // Store env

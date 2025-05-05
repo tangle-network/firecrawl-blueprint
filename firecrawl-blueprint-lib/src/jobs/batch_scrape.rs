@@ -1,33 +1,13 @@
 use crate::context::Context;
+use anyhow::{Error, anyhow};
 use blueprint_sdk::{
     Error as SdkError,
     extract::Context as SdkContext,
     tangle::extract::{TangleArg, TangleResult},
 };
-use ipfs_api_backend_hyper::IpfsApi; // Import IpfsApi trait for add method
 use serde_json::Value;
 use std::io::Cursor; // Required for ipfs_client.add with bytes
-use thiserror::Error;
-
-// Define a specific error type for this handler
-#[derive(Error, Debug)]
-pub enum BatchScrapeHandlerError {
-    #[error("HTTP request failed: {0}")]
-    HttpRequest(#[from] reqwest::Error),
-    #[error("JSON parsing failed: {0}")]
-    JsonParse(#[from] serde_json::Error),
-    #[error("IPFS operation failed: {0}")]
-    Ipfs(String), // Use String to capture IPFS error details
-    #[error("Input data is not valid JSON")]
-    InvalidInputJson,
-}
-
-// Map internal error to SDK error
-impl From<BatchScrapeHandlerError> for SdkError {
-    fn from(err: BatchScrapeHandlerError) -> Self {
-        SdkError::JobExecutionFailed(anyhow::anyhow!(err.to_string()))
-    }
-}
+// Removed custom error type: using unwrap() in handler
 
 /// Job ID for the batch scrape operation.
 pub const JOB_BATCH_SCRAPE_ID: u64 = 3;
@@ -54,7 +34,7 @@ pub async fn handle_batch_scrape(
         .json(&input_json) // Send parsed JSON
         .send()
         .await
-        .map_err(BatchScrapeHandlerError::HttpRequest)?;
+        .map_err(|e| BatchScrapeHandlerError::HttpRequest(anyhow!(e)))?;
 
     // Ensure the request was successful
     if !response.status().is_success() {
@@ -63,20 +43,14 @@ pub async fn handle_batch_scrape(
             .text()
             .await
             .unwrap_or_else(|_| "Failed to read error body".to_string());
-        return Err(BatchScrapeHandlerError::HttpRequest(reqwest::Error::from(
-            // Create an error that includes status and body text
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("HTTP Error {}: {}", status, text),
-            ),
-        ))
-        .into());
+        return Err(BatchScrapeHandlerError::HttpRequest(anyhow!(
+            "HTTP Error {}: {}",
+            status,
+            text
+        )));
     }
 
-    let response_json: Value = response
-        .json()
-        .await
-        .map_err(BatchScrapeHandlerError::JsonParse)?;
+    let response_json: Value = response.json().await.unwrap();
 
     // Convert the JSON response back to bytes for IPFS
     let response_bytes =
@@ -84,14 +58,10 @@ pub async fn handle_batch_scrape(
 
     // Add the response bytes to IPFS
     let response_cursor = Cursor::new(response_bytes);
-    let ipfs_result = ctx
-        .ipfs_client
-        .add(response_cursor)
-        .await
-        .map_err(|e| BatchScrapeHandlerError::Ipfs(e.to_string()))?;
+    let ipfs_result = ctx.ipfs_client.add(response_cursor).await.unwrap();
 
     let cid = ipfs_result.hash;
 
     // Return the CID as a TangleResult
-    Ok(TangleResult::new(cid))
+    TangleResult(cid)
 }
