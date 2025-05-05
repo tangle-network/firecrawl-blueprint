@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  firecrawl:
+    image: mendableai/firecrawl:latest
+    ports:
+      - "${{ env.firecrawl_http_port }}:8080" # Map host port from env var to container port 8080
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    ports:
+      - "5001:5001" # API port
+      - "8080:8080" # Gateway port
+    volumes:
+      - ipfs-data:/data/ipfs # Mount named volume for persistence
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  ipfs-data:
+    driver: local

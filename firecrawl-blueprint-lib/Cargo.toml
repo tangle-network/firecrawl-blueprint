@@ -13,8 +13,16 @@ keywords.workspace = true
 
 [dependencies]
 blueprint-sdk = { workspace = true, features = ["std", "tangle", "macros"] }
-tokio = { workspace = true, features = ["sync"] }
-
+tokio = { workspace = true, features = ["sync", "rt-multi-thread"] } # Added rt-multi-thread for reqwest
+reqwest = { workspace = true, features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+ipfs-api = { workspace = true }
+ipfs-api-backend-hyper = { workspace = true } # Explicitly add backend
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+url = { workspace = true } # Already used in context.rs, ensure it's workspace dep
+bollard = { workspace = true } # Already used in context.rs, ensure it's workspace dep
 [dev-dependencies]
 blueprint-sdk = { workspace = true, features = ["testing", "tangle"] }
 tokio = { workspace = true, features = ["macros"] }
